@@ -13,7 +13,7 @@
 
 - [type Jprq](#Jprq)
   - [func New(baseHost string) Jprq](#New)
-  - [func (j *Jprq) AddTunnel(username string, port int, conn *websocket.Conn) Tunnel](#Jprq.AddTunnel)
+  - [func (j *Jprq) AddTunnel(username string,conn *websocket.Conn) Tunnel](#Jprq.AddTunnel)
   - [func (j \*Jprq) DeleteTunnel(host string)](#Jprq.DeleteTunnel)
   - [func (j Jprq) GetTunnelByHost(host string) (Tunnel, error)](#Jprq.GetTunnelByHost)
   - [func (j Jprq) HttpHandler(writer http.ResponseWriter, request \*http.Request)](#Jprq.HttpHandler)
@@ -49,7 +49,7 @@ func New(baseHost string) Jprq
 ### <a name="Jprq.AddTunnel">func</a> (\*Jprq) [AddTunnel](/src/target/tunnel.go?s=592:672#L32)
 
 ```go
-func (j *Jprq) AddTunnel(username string, port int, conn *websocket.Conn) Tunnel
+func (j *Jprq) AddTunnel(username string, conn *websocket.Conn) Tunnel
 ```
 
 ### <a name="Jprq.DeleteTunnel">func</a> (\*Jprq) [DeleteTunnel](/src/target/tunnel.go?s=1222:1262#L55)

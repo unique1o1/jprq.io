@@ -1,16 +1,18 @@
 package jprq
 
 import (
+	"fmt"
 	"github.com/go-errors/errors"
 	"github.com/gofrs/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/labstack/gommon/log"
 	"gopkg.in/mgo.v2/bson"
+	"log"
+	"math/rand"
+	"time"
 )
 
 type Tunnel struct {
 	host           string
-	port           int
 	conn           *websocket.Conn
 	token          string
 	requests       map[uuid.UUID]RequestMessage
@@ -21,28 +23,37 @@ type Tunnel struct {
 
 func (j Jprq) GetTunnelByHost(host string) (*Tunnel, error) {
 	t, ok := j.tunnels[host]
+
 	if !ok {
 		return t, errors.New("Tunnel doesn't exist")
 	}
 
 	return t, nil
 }
-
-func (j *Jprq) AddTunnel(host string, port int, conn *websocket.Conn) *Tunnel {
-	token := generateToken()
+func (j Jprq) GetUnusedHost(host, subdomain string) string {
+	if _, err := j.GetTunnelByHost(host); err == nil {
+		rand.Seed(time.Now().UnixNano())
+		min := 0
+		max := len(Adjectives)
+		hostPrefix := fmt.Sprintf("%s-%s", Adjectives[rand.Intn(max-min)+min], subdomain)
+		host = fmt.Sprintf("%s.%s", hostPrefix, j.baseHost)
+		host = j.GetUnusedHost(host, subdomain)
+	}
+	return host
+}
+func (j *Jprq) AddTunnel(host string, conn *websocket.Conn) *Tunnel {
+	token, _ := uuid.NewV4()
 	requests := make(map[uuid.UUID]RequestMessage)
-	requestChan, responseChan := make(chan RequestMessage), make(chan ResponseMessage)
+	requestChan := make(chan RequestMessage)
 	tunnel := Tunnel{
-		host:         host,
-		port:         port,
-		conn:         conn,
-		token:        token,
-		requests:     requests,
-		requestChan:  requestChan,
-		responseChan: responseChan,
+		host:        host,
+		conn:        conn,
+		token:       token.String(),
+		requests:    requests,
+		requestChan: requestChan,
 	}
 
-	log.Info("New Tunnel: ", host)
+	log.Println("New Tunnel: ", host)
 	j.tunnels[host] = &tunnel
 	return &tunnel
 }
@@ -52,13 +63,13 @@ func (j *Jprq) DeleteTunnel(host string) {
 	if !ok {
 		return
 	}
-	log.Infof("Deleted Tunnel: %s, Number Of Requests Served: %d", host, tunnel.numOfReqServed)
+	log.Printf("Deleted Tunnel: %s, Number Of Requests Served: %d", host, tunnel.numOfReqServed)
 	close(tunnel.requestChan)
-	close(tunnel.responseChan)
 	delete(j.tunnels, host)
 }
 
 func (tunnel *Tunnel) DispatchRequests() {
+
 	for {
 		select {
 		case requestMessage, more := <-tunnel.requestChan:
@@ -68,26 +79,6 @@ func (tunnel *Tunnel) DispatchRequests() {
 			messageContent, _ := bson.Marshal(requestMessage)
 			tunnel.requests[requestMessage.ID] = requestMessage
 			tunnel.conn.WriteMessage(websocket.BinaryMessage, messageContent)
-		}
-	}
-}
-
-func (tunnel *Tunnel) DispatchResponses() {
-	for {
-		select {
-		case responseMessage, more := <-tunnel.responseChan:
-			if !more {
-				return
-			}
-			requestMessage, ok := tunnel.requests[responseMessage.RequestId]
-			if !ok {
-				log.Error("Request Not Found", responseMessage.RequestId)
-				continue
-			}
-
-			requestMessage.ResponseChan <- responseMessage
-			delete(tunnel.requests, requestMessage.ID)
-			tunnel.numOfReqServed++
 		}
 	}
 }

@@ -12,7 +12,7 @@ import (
 var baseHost string
 
 func main() {
-	flag.StringVar(&baseHost, "host", "jprq.io", "Base Host")
+	flag.StringVar(&baseHost, "host", "yunik.com.np", "Base Host")
 	flag.Parse()
 
 	j := jprq.New(baseHost)

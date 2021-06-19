@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"github.com/gosimple/slug"
-	"github.com/labstack/gommon/log"
 	"gopkg.in/mgo.v2/bson"
+	"log"
 	"net/http"
-	"strconv"
 )
 
 var upgrader = websocket.Upgrader{
@@ -19,36 +18,25 @@ var upgrader = websocket.Upgrader{
 }
 
 func (j Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("New socket connection request....")
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		log.Println("Error occurred when creating socket: ", err)
 		return
 	}
 	defer ws.Close()
 
 	query := r.URL.Query()
 	usernames := query["username"]
-	ports := query["port"]
-
-	if len(usernames) != 1 || len(ports) != 1 {
-		log.Error("Websocket Connection: Bad Request: ", query)
+	if len(usernames) != 1  {
+		log.Println("Websocket Connection: Bad Request: ", query)
 		return
 	}
 
-	username := usernames[0]
-	username = slug.Make(username)
-	port, _ := strconv.Atoi(ports[0])
-	host := fmt.Sprintf("%s.%s", username, j.baseHost)
-
-	if _, err := j.GetTunnelByHost(host); err == nil {
-		errMessage := fmt.Sprintf("Tunnel %s is busy", host)
-		message := ErrorMessage{errMessage}
-		messageContent, _ := bson.Marshal(message)
-		ws.WriteMessage(websocket.BinaryMessage, messageContent)
-		ws.Close()
-		return
-	}
-
-	tunnel := j.AddTunnel(host, port, ws)
+	subdomain := usernames[0]
+	subdomain = slug.Make(subdomain)
+	host := j.GetUnusedHost(fmt.Sprintf("%s.%s", subdomain, j.baseHost), subdomain)
+	tunnel := j.AddTunnel(host, ws)
 	defer j.DeleteTunnel(tunnel.host)
 
 	message := TunnelMessage{tunnel.host, tunnel.token}
@@ -57,26 +45,33 @@ func (j Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	ws.WriteMessage(websocket.BinaryMessage, messageContent)
 
 	go tunnel.DispatchRequests()
-	go tunnel.DispatchResponses()
 
 	for {
 		_, message, err := ws.ReadMessage()
 		if err != nil {
+			log.Println("Connection broken.")
 			break
 		}
 
 		response := ResponseMessage{}
 		err = bson.Unmarshal(message, &response)
 		if err != nil {
-			log.Error("Failed to Unmarshal Websocket Message: ", string(message), err)
+			log.Println("Failed to Unmarshal Websocket Message: ", string(message), err)
 			continue
 		}
 
 		if response.Token != tunnel.token {
-			log.Error("Authentication Failed: ", tunnel.host)
+			log.Println("Authentication Failed: ", tunnel.host)
 			continue
 		}
 
-		tunnel.responseChan <- response
+		requestMessage, ok := tunnel.requests[response.RequestId]
+		if !ok {
+			log.Println("Request Not Found", response.RequestId)
+			continue
+		}
+		tunnel.numOfReqServed++
+		delete(tunnel.requests, requestMessage.ID)
+		requestMessage.ResponseChan <- response
 	}
 }
