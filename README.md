@@ -1,9 +1,15 @@
 # jprq.io
 
 `github.com/azimjohn/jprq.io/jprq`
-
+- [Build](#pkg-build)
 - [Overview](#pkg-overview)
 - [Index](#pkg-index)
+## <a name="pkg-build">Build</a>
+
+```bash
+go build .
+./jprq.io
+```
 
 ## <a name="pkg-overview">Overview</a>
 
