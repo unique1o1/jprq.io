@@ -1,11 +1,11 @@
 # jprq.io
 
-`github.com/azimjohn/jprq.io/jprq`
+`github.com/unique1o1/jprq.io/`
 - [Build](#pkg-build)
 - [Overview](#pkg-overview)
 - [Index](#pkg-index)
-## <a name="pkg-build">Build</a>
 
+## <a name="pkg-build">Build</a>
 ```bash
 go build .
 ./jprq.io
@@ -14,7 +14,7 @@ go build .
 ## <a name="pkg-overview">Overview</a>
 
 <img width="100%" src="https://i.imgur.com/1kXPzyd.png">
-
+jprq
 ## <a name="pkg-index">Index</a>
 
 - [type Jprq](#Jprq)
