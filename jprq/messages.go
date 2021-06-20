@@ -9,9 +9,8 @@ import (
 )
 
 type ErrorMessage struct {
-	Error  string `bson:"error"`
+	Error string `bson:"error"`
 }
-
 
 type TunnelMessage struct {
 	Host  string `bson:"host"`
@@ -24,6 +23,7 @@ type RequestMessage struct {
 	URL          string               `bson:"url"`
 	Body         []byte               `bson:"body"`
 	Header       map[string]string    `bson:"header"`
+	Cookie       []*http.Cookie       `bson:"cookie"`
 	ResponseChan chan ResponseMessage `bson:"-"`
 }
 
@@ -33,6 +33,7 @@ type ResponseMessage struct {
 	Body      []byte            `bson:"body"`
 	Status    int               `bson:"status"`
 	Header    map[string]string `bson:"header"`
+	Cookie    []*http.Cookie    `bson:"cookie"`
 }
 
 func FromHttpRequest(httpRequest *http.Request) RequestMessage {
@@ -40,6 +41,7 @@ func FromHttpRequest(httpRequest *http.Request) RequestMessage {
 	requestMessage.ID, _ = uuid.NewV4()
 	requestMessage.Method = httpRequest.Method
 	requestMessage.URL = httpRequest.URL.RequestURI()
+	requestMessage.Cookie = httpRequest.Cookies()
 
 	if httpRequest.Body != nil {
 		body, _ := ioutil.ReadAll(httpRequest.Body)
@@ -65,6 +67,11 @@ func (responseMessage ResponseMessage) WriteToHttpResponse(writer http.ResponseW
 	for name, value := range responseMessage.Header {
 		writer.Header().Set(name, value)
 	}
+	for _, cookie := range responseMessage.Cookie {
+		cookie.Path = "/"
+		http.SetCookie(writer, cookie)
+	}
+
 	if 100 > responseMessage.Status || responseMessage.Status > 600 {
 		responseMessage.Status = http.StatusInternalServerError
 	}
