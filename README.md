@@ -11,6 +11,10 @@ go build .
 ./jprq.io
 ```
 
+#### TODO
+- Add websocket support
+
+
 ## <a name="pkg-overview">Overview</a>
 
 <img width="100%" src="https://i.imgur.com/1kXPzyd.png">
