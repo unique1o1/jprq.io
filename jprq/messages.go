@@ -18,40 +18,40 @@ type TunnelMessage struct {
 }
 
 type RequestMessage struct {
-	ID           uuid.UUID            `bson:"id"`
-	Method       string               `bson:"method"`
-	URL          string               `bson:"url"`
-	Body         []byte               `bson:"body"`
-	Header       map[string]string    `bson:"header"`
-	Cookie       []*http.Cookie       `bson:"cookie"`
-	ResponseChan chan ResponseMessage `bson:"-"`
+	SocketMsgType int                  `bson:"socket_msg_type,omitempty"`
+	ID            uuid.UUID            `bson:"id,omitempty"`
+	Method        string               `bson:"method,omitempty"`
+	URL           string               `bson:"url,omitempty"`
+	Body          []byte               `bson:"body,omitempty"`
+	Header        http.Header          `bson:"header,omitempty"`
+	Cookie        []*http.Cookie       `bson:"cookie,omitempty"`
+	ResponseChan  chan ResponseMessage `bson:"-"`
 }
 
 type ResponseMessage struct {
-	RequestId uuid.UUID         `bson:"request_id"`
-	Token     string            `bson:"token"`
-	Body      []byte            `bson:"body"`
-	Status    int               `bson:"status"`
-	Header    map[string]string `bson:"header"`
-	Cookie    []*http.Cookie    `bson:"cookie"`
+	RequestId     uuid.UUID      `bson:"request_id,omitempty"`
+	SocketMsgType int            `bson:"socket_msg_type,omitempty"`
+	Token         string         `bson:"token,omitempty"`
+	Body          []byte         `bson:"body,omitempty"`
+	Status        int            `bson:"status,omitempty"`
+	Header        http.Header    `bson:"header,omitempty"`
+	Cookie        []*http.Cookie `bson:"cookie,omitempty"`
 }
 
-func FromHttpRequest(httpRequest *http.Request) RequestMessage {
+func PackageHttpRequest(httpRequest *http.Request) RequestMessage {
 	requestMessage := RequestMessage{}
 	requestMessage.ID, _ = uuid.NewV4()
 	requestMessage.Method = httpRequest.Method
 	requestMessage.URL = httpRequest.URL.RequestURI()
 	requestMessage.Cookie = httpRequest.Cookies()
+	requestMessage.Header = httpRequest.Header
 
 	if httpRequest.Body != nil {
 		body, _ := ioutil.ReadAll(httpRequest.Body)
 		requestMessage.Body = body
 	}
 
-	requestMessage.Header = make(map[string]string)
-	for name, values := range httpRequest.Header {
-		requestMessage.Header[name] = values[0]
-	}
+	//requestMessage.Header = make(map[string][]string)
 
 	requestMessage.ResponseChan = make(chan ResponseMessage)
 
@@ -63,9 +63,10 @@ func (responseMessage ResponseMessage) WriteToHttpResponse(writer http.ResponseW
 	writer.Header().Set("Access-Control-Allow-Origin", "*")
 	writer.Header().Set("Access-Control-Allow-Headers", "*")
 	writer.Header().Set("Access-Control-Max-Age", "86400")
-
 	for name, value := range responseMessage.Header {
-		writer.Header().Set(name, value)
+		for _, v := range value {
+			writer.Header().Add(name, v)
+		}
 	}
 	for _, cookie := range responseMessage.Cookie {
 		cookie.Path = "/"
