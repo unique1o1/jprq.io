@@ -18,6 +18,7 @@ type TunnelMessage struct {
 }
 
 type RequestMessage struct {
+	Status        int                  `bson:"status,omitempty"`
 	SocketMsgType int                  `bson:"socket_msg_type,omitempty"`
 	ID            uuid.UUID            `bson:"id,omitempty"`
 	Method        string               `bson:"method,omitempty"`

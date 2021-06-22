@@ -16,6 +16,7 @@ func (j *Jprq) httpHandler(w http.ResponseWriter, r *http.Request) {
 
 	requestMessage := PackageHttpRequest(r)
 	tunnel.requestsTracker.Store(requestMessage.ID, requestMessage.ResponseChan)
+
 	tunnel.requestChan <- requestMessage
 	responseMessage, ok := <-requestMessage.ResponseChan
 	tunnel.requestsTracker.Delete(requestMessage.ID)

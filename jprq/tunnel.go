@@ -55,7 +55,6 @@ func (j *Jprq) AddTunnel(host string, conn *websocket.Conn) *Tunnel {
 
 	log.Println("New Tunnel: ", host)
 	j.tunnels.Store(host, &tunnel)
-	log.Println(j.tunnels.Load(host))
 	return &tunnel
 }
 
@@ -83,6 +82,7 @@ func (tunnel *Tunnel) DispatchRequests() {
 	for {
 		select {
 		case requestMessage, more := <-tunnel.requestChan:
+
 			if !more {
 				return
 			}
