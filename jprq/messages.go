@@ -59,9 +59,9 @@ func PackageHttpRequest(httpRequest *http.Request) RequestMessage {
 	return requestMessage
 }
 
-func (responseMessage ResponseMessage) WriteToHttpResponse(writer http.ResponseWriter) {
+func (responseMessage ResponseMessage) WriteToHttpResponse(writer http.ResponseWriter, r *http.Request) {
 	// Set CORS Headers
-	writer.Header().Set("Access-Control-Allow-Origin", "*")
+	writer.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
 	writer.Header().Set("Access-Control-Allow-Headers", "*")
 	writer.Header().Set("Access-Control-Max-Age", "86400")
 	for name, value := range responseMessage.Header {

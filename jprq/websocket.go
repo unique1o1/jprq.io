@@ -7,6 +7,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"log"
 	"net/http"
+	"time"
 )
 
 var upgrader = websocket.Upgrader{
@@ -31,7 +32,6 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	tunnel.requestChan <- requestMessage
 	responseMessage, ok := <-requestMessage.ResponseChan
 	if !ok {
-		log.Println("closing responsechan")
 		return
 	}
 	log.Println(responseMessage.Header)
@@ -45,12 +45,14 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 			upgradeHeader.Set("Set-Cookie", hdr)
 		}
 	}
+
 	ws, err := upgrader.Upgrade(w, r, upgradeHeader)
 	if err != nil {
 		log.Println("Error occurred when creating socket: ", err)
 		return
 	}
 	defer ws.Close()
+	keepAlive(ws, time.Minute)
 
 	PackageWSRequest := func(body []byte, msgType int) RequestMessage {
 		requestMessage := RequestMessage{}
@@ -60,34 +62,37 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 		return requestMessage
 	}
 
-	errClient := make(chan error, 1)
-	errBackend := make(chan error, 1)
-	go func() {
+	errCh := make(chan error, 1)
+	go func(errCh chan error) {
 		for {
 
 			msgType, message, err := ws.ReadMessage()
 			if err != nil {
-				tunnel.requestChan <- RequestMessage{Status: -1}
-				errClient <- err
+				select {
+				case <-tunnel.requestChanCloseNotifier:
+
+					break
+				default:
+					tunnel.requestChan <- RequestMessage{Status: -1}
+				}
 				log.Println(err)
+				errCh <- err
 				break
 			}
 			log.Println(string(message))
 			requestMessage := PackageWSRequest(message, msgType)
 			select {
 			case <-tunnel.requestChanCloseNotifier:
-				log.Println("Exiting ...")
 				break
 			default:
-				log.Println("in default")
 				tunnel.requestChan <- requestMessage
 
 			}
 
 		}
-		log.Println("exiting as well")
+		log.Println("frontend facing goroutine exited")
 
-	}()
+	}(errCh)
 	go func() {
 		r, ok := tunnel.requestsTracker.Load(rId)
 		if !ok {
@@ -96,30 +101,19 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 		for responseMessage = range r.(chan ResponseMessage) {
 			_ = ws.WriteMessage(responseMessage.SocketMsgType, responseMessage.Body)
 		}
-		_ = ws.WriteMessage(websocket.CloseMessage, responseMessage.Body)
-
-		log.Println("exiting as well")
+		_ = ws.WriteMessage(websocket.CloseMessage, []byte(""))
+		log.Println("client facing goroutine exited")
 
 	}()
 	{
-		var message string
-		select {
-		case err = <-errClient:
-			{
-				// close client side goroutine too
-				rChan, ok := tunnel.requestsTracker.Load(rId)
-				if ok {
-					log.Println("closing resons")
-					close(rChan.(chan ResponseMessage))
-				}
-				tunnel.requestsTracker.Delete(rId) // delete from map as well otherwise channel may be closed twice
-			}
-			message = "websocketproxy: Error when copying from client to backend: %v"
-			log.Printf(message, err)
-		case err = <-errBackend:
-			message = "websocketproxy: Error when copying from backend to client: %v"
-			log.Printf(message, err)
+		<-errCh
+		// close client facing goroutine too
+		rChan, ok := tunnel.requestsTracker.Load(rId)
+		if ok {
+			log.Println("closing requestsTracker channnel")
+			close(rChan.(chan ResponseMessage))
 		}
+		tunnel.requestsTracker.Delete(rId) // delete from map as well otherwise channel may be closed twice
 	}
 
 }
@@ -131,6 +125,7 @@ func (j *Jprq) ClientWebsocketHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer ws.Close()
+	keepAlive(ws, time.Minute)
 
 	query := r.URL.Query()
 	usernames := query["username"]
@@ -152,19 +147,17 @@ func (j *Jprq) ClientWebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	go tunnel.DispatchRequests()
 
 	for {
-		msgType, message, err := ws.ReadMessage()
-		log.Println(msgType)
+		_, message, err := ws.ReadMessage()
 		if err != nil {
 			log.Println(err)
-			if websocket.IsCloseError(err, websocket.CloseNoStatusReceived, websocket.CloseAbnormalClosure) {
-				log.Println("here")
+			if _, ok := err.(*websocket.CloseError); ok {
+				//websocket.CloseAbnormalClosure is calle when process exits or websocket.close() is called
+				fmt.Println("\n\033[31mServer connection closed\033[00m")
 				break
 			}
-
 			log.Println(err)
 			//responseChan <- response // sending this will cause the goroutine to return so no need to close the channel
-
-			break
+			continue
 		}
 		response := ResponseMessage{}
 		err = bson.Unmarshal(message, &response)
@@ -172,6 +165,8 @@ func (j *Jprq) ClientWebsocketHandler(w http.ResponseWriter, r *http.Request) {
 			log.Println("Failed to Unmarshal Websocket Message: ", string(message), err)
 			continue
 		}
+		log.Println(response)
+
 		if response.Status == -1 { // for websockets
 			r, ok := tunnel.requestsTracker.Load(response.RequestId)
 			if !ok {
@@ -193,8 +188,6 @@ func (j *Jprq) ClientWebsocketHandler(w http.ResponseWriter, r *http.Request) {
 		responseChan := r.(chan ResponseMessage)
 		tunnel.numOfReqServed++
 		responseChan <- response
-		log.Println("end of forloop")
 	}
-	log.Println("end of func web")
 
 }

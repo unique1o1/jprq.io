@@ -1,5 +1,31 @@
 package jprq
 
+import (
+	"github.com/gorilla/websocket"
+	"time"
+)
+
+func keepAlive(ws *websocket.Conn, timeout time.Duration) {
+	lastResponse := time.Now()
+	ws.SetPongHandler(func(msg string) error {
+		lastResponse = time.Now()
+		return nil
+	})
+	go func() {
+		for {
+			err := ws.WriteMessage(websocket.PingMessage, []byte("ping"))
+			if err != nil {
+				return
+			}
+			time.Sleep(timeout / 2)
+			if time.Since(lastResponse) > timeout {
+				ws.Close()
+				return
+			}
+		}
+	}()
+}
+
 var Adjectives = []string{
 	"amazing", "ambitious", "amusing", "awesome",
 	"brave", "bright", "broad-minded",
@@ -18,4 +44,3 @@ var Adjectives = []string{
 	"talented", "thoughtful", "understanding", "versatile",
 	"warmhearted", "wise", "willing", "witty", "wonderful",
 }
-

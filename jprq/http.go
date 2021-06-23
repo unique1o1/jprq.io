@@ -24,7 +24,7 @@ func (j *Jprq) httpHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
 		return
 	}
-	responseMessage.WriteToHttpResponse(w)
+	responseMessage.WriteToHttpResponse(w, r)
 
 }
 
