@@ -149,15 +149,13 @@ func (j *Jprq) ClientWebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	for {
 		_, message, err := ws.ReadMessage()
 		if err != nil {
-			log.Println(err)
 			if _, ok := err.(*websocket.CloseError); ok {
 				//websocket.CloseAbnormalClosure is calle when process exits or websocket.close() is called
 				fmt.Println("\n\033[31mServer connection closed\033[00m")
-				break
 			}
 			log.Println(err)
 			//responseChan <- response // sending this will cause the goroutine to return so no need to close the channel
-			continue
+			break
 		}
 		response := ResponseMessage{}
 		err = bson.Unmarshal(message, &response)
@@ -165,8 +163,6 @@ func (j *Jprq) ClientWebsocketHandler(w http.ResponseWriter, r *http.Request) {
 			log.Println("Failed to Unmarshal Websocket Message: ", string(message), err)
 			continue
 		}
-		log.Println(response)
-
 		if response.Status == -1 { // for websockets
 			r, ok := tunnel.requestsTracker.Load(response.RequestId)
 			if !ok {
