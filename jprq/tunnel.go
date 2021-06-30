@@ -12,9 +12,20 @@ import (
 	"time"
 )
 
+type Socket struct {
+	sync.Mutex
+	*websocket.Conn
+}
+
+func (c *Socket) WriteMessage(messageType int, data []byte) error {
+	c.Lock()
+	defer c.Unlock()
+	return c.Conn.WriteMessage(messageType, data)
+}
+
 type Tunnel struct {
 	host                     string
-	conn                     *websocket.Conn
+	conn                     *Socket
 	token                    string
 	requestsTracker          sync.Map
 	requestChan              chan RequestMessage
@@ -41,7 +52,7 @@ func (j *Jprq) GetUnusedHost(host, subdomain string) string {
 	}
 	return host
 }
-func (j *Jprq) AddTunnel(host string, conn *websocket.Conn) *Tunnel {
+func (j *Jprq) AddTunnel(host string, conn *Socket) *Tunnel {
 	token, _ := uuid.NewV4()
 	requestChan := make(chan RequestMessage)
 	tunnel := Tunnel{

@@ -47,12 +47,13 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ws, err := upgrader.Upgrade(w, r, upgradeHeader)
+	conn := &Socket{Conn: ws}
 	if err != nil {
 		log.Println("Error occurred when creating socket: ", err)
 		return
 	}
-	defer ws.Close()
-	keepAlive(ws, time.Minute)
+	defer conn.Close()
+	keepAlive(conn, time.Minute)
 
 	PackageWSRequest := func(body []byte, msgType int) RequestMessage {
 		requestMessage := RequestMessage{}
@@ -66,7 +67,7 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	go func(errCh chan error) {
 		for {
 
-			msgType, message, err := ws.ReadMessage()
+			msgType, message, err := conn.ReadMessage()
 			if err != nil {
 				select {
 				case <-tunnel.requestChanCloseNotifier:
@@ -99,9 +100,9 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for responseMessage = range r.(chan ResponseMessage) {
-			_ = ws.WriteMessage(responseMessage.SocketMsgType, responseMessage.Body)
+			_ = conn.WriteMessage(responseMessage.SocketMsgType, responseMessage.Body)
 		}
-		_ = ws.WriteMessage(websocket.CloseMessage, []byte(""))
+		_ = conn.WriteMessage(websocket.CloseMessage, []byte(""))
 		log.Println("client facing goroutine exited")
 
 	}()
@@ -120,12 +121,13 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 func (j *Jprq) ClientWebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("New socket connection request....")
 	ws, err := upgrader.Upgrade(w, r, nil)
+	conn := &Socket{Conn: ws}
 	if err != nil {
 		log.Println("Error occurred when creating socket: ", err)
 		return
 	}
-	defer ws.Close()
-	keepAlive(ws, time.Minute)
+	defer conn.Close()
+	keepAlive(conn, time.Minute)
 
 	query := r.URL.Query()
 	usernames := query["username"]
@@ -137,17 +139,17 @@ func (j *Jprq) ClientWebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	subdomain := usernames[0]
 	subdomain = slug.Make(subdomain)
 	host := j.GetUnusedHost(fmt.Sprintf("%s.%s", subdomain, j.baseHost), subdomain)
-	tunnel := j.AddTunnel(host, ws)
+	tunnel := j.AddTunnel(host, conn)
 	defer j.DeleteTunnel(tunnel.host)
 
 	message := TunnelMessage{tunnel.host, tunnel.token}
 	messageContent, err := bson.Marshal(message)
 
-	ws.WriteMessage(websocket.BinaryMessage, messageContent)
+	conn.WriteMessage(websocket.BinaryMessage, messageContent)
 	go tunnel.DispatchRequests()
 
 	for {
-		_, message, err := ws.ReadMessage()
+		_, message, err := conn.ReadMessage()
 		if err != nil {
 			if _, ok := err.(*websocket.CloseError); ok {
 				//websocket.CloseAbnormalClosure is calle when process exits or websocket.close() is called

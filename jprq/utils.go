@@ -5,21 +5,21 @@ import (
 	"time"
 )
 
-func keepAlive(ws *websocket.Conn, timeout time.Duration) {
+func keepAlive(conn *Socket, timeout time.Duration) {
 	lastResponse := time.Now()
-	ws.SetPongHandler(func(msg string) error {
+	conn.SetPongHandler(func(msg string) error {
 		lastResponse = time.Now()
 		return nil
 	})
 	go func() {
 		for {
-			err := ws.WriteMessage(websocket.PingMessage, []byte("ping"))
+			err := conn.WriteMessage(websocket.PingMessage, []byte("ping"))
 			if err != nil {
 				return
 			}
 			time.Sleep(timeout / 2)
 			if time.Since(lastResponse) > timeout {
-				ws.Close()
+				conn.Close()
 				return
 			}
 		}
