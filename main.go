@@ -19,7 +19,7 @@ func main() {
 
 	j := jprq.New(baseHost)
 	r := mux.NewRouter()
-	r.HandleFunc("/_ws/", j.ClientWebsocketHandler)
+	r.HandleFunc("/_ws/", j.JPRQClientWebsocketHandler)
 	r.PathPrefix("/").HandlerFunc(j.RequestHandler)
 	fmt.Println("Server is running on Port 4200")
 	log.Fatal(http.ListenAndServe(":4200", r))

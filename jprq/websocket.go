@@ -80,7 +80,6 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 				errCh <- err
 				break
 			}
-			log.Println(string(message))
 			requestMessage := PackageWSRequest(message, msgType)
 			select {
 			case <-tunnel.requestChanCloseNotifier:
@@ -118,7 +117,7 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
-func (j *Jprq) ClientWebsocketHandler(w http.ResponseWriter, r *http.Request) {
+func (j *Jprq) JPRQClientWebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("New socket connection request....")
 	ws, err := upgrader.Upgrade(w, r, nil)
 	conn := &Socket{Conn: ws}
