@@ -18,7 +18,7 @@ go build .
 ./jprq.io -host <your_domain_name>
 ```
 ### Note
-- To get the server working, add an `A Record` in you DNS pointing your wildcard subdomain to your server's IP address. 
+- To get the server working, add an `A Record` in your DNS pointing your wildcard subdomain to your server's IP address. 
 
 
 ## <a name="pkg-overview">Overview</a>
