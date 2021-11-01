@@ -1,6 +1,7 @@
 package jprq
 
 import (
+	"fmt"
 	"net/http"
 )
 
@@ -30,6 +31,7 @@ func (j *Jprq) httpHandler(w http.ResponseWriter, r *http.Request) {
 
 func (j *Jprq) RequestHandler(writer http.ResponseWriter, request *http.Request) {
 	if request.Header.Get("Upgrade") == "websocket" {
+		fmt.Println("Establishing socket connection to client..")
 		j.WebsocketHandler(writer, request)
 	} else {
 		j.httpHandler(writer, request)

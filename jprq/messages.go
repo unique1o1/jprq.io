@@ -2,11 +2,12 @@ package jprq
 
 import (
 	"bytes"
-	"github.com/gofrs/uuid"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
+
+	"github.com/gofrs/uuid"
 )
 
 type ErrorMessage struct {
@@ -47,7 +48,9 @@ func PackageHttpRequest(httpRequest *http.Request) RequestMessage {
 	requestMessage.URL = httpRequest.URL.RequestURI()
 	requestMessage.Cookie = httpRequest.Cookies()
 	requestMessage.Header = httpRequest.Header
-
+	if requestMessage.Header.Get("Connection") == "Upgrade" && requestMessage.Header.Get("Upgrade") == "" {
+		requestMessage.Header.Del("Connection")
+	}
 	if httpRequest.Body != nil {
 		body, _ := ioutil.ReadAll(httpRequest.Body)
 		requestMessage.Body = body

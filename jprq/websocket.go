@@ -2,12 +2,13 @@ package jprq
 
 import (
 	"fmt"
-	"github.com/gorilla/websocket"
-	"github.com/gosimple/slug"
-	"gopkg.in/mgo.v2/bson"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/gosimple/slug"
+	"gopkg.in/mgo.v2/bson"
 )
 
 var upgrader = websocket.Upgrader{
@@ -29,12 +30,17 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	rId := requestMessage.ID
 	tunnel.requestsTracker.Store(requestMessage.ID, requestMessage.ResponseChan)
 
-	tunnel.requestChan <- requestMessage
+	{
+		/*
+			send the http websocket upgrade request to the client and establish the socket connection in the JPRQ Client side
+		*/
+		tunnel.requestChan <- requestMessage
+	}
 	responseMessage, ok := <-requestMessage.ResponseChan
 	if !ok {
 		return
 	}
-	log.Println(responseMessage.Header)
+
 	// Only pass those headers to the upgrader.
 	upgradeHeader := http.Header{}
 	{
@@ -53,7 +59,7 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
-	keepAlive(conn, time.Minute)
+	keepAlive(conn, time.Second*30)
 
 	PackageWSRequest := func(body []byte, msgType int) RequestMessage {
 		requestMessage := RequestMessage{}
@@ -61,8 +67,8 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 		requestMessage.ID = rId
 		requestMessage.Body = body
 		return requestMessage
-	}
 
+	}
 	errCh := make(chan error, 1)
 	go func(errCh chan error) {
 		for {
@@ -71,10 +77,14 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				select {
 				case <-tunnel.requestChanCloseNotifier:
-
+					// when tunnel closes requestChan will be closed
 					break
 				default:
-					tunnel.requestChan <- RequestMessage{Status: -1}
+					// signals client that the frontend socket connection has been broken
+					tunnel.requestChan <- RequestMessage{
+						Status: -1,
+						ID:     rId,
+					}
 				}
 				log.Println(err)
 				errCh <- err
@@ -107,15 +117,13 @@ func (j *Jprq) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 	{
 		<-errCh
-		// close client facing goroutine too
-		rChan, ok := tunnel.requestsTracker.Load(rId)
+		rChan, ok := tunnel.requestsTracker.Load(rId) // close client facing goroutine too
 		if ok {
 			log.Println("closing requestsTracker channnel")
 			close(rChan.(chan ResponseMessage))
 		}
 		tunnel.requestsTracker.Delete(rId) // delete from map as well otherwise channel may be closed twice
 	}
-
 }
 func (j *Jprq) JPRQClientWebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("New socket connection request....")
@@ -145,6 +153,7 @@ func (j *Jprq) JPRQClientWebsocketHandler(w http.ResponseWriter, r *http.Request
 	messageContent, err := bson.Marshal(message)
 
 	conn.WriteMessage(websocket.BinaryMessage, messageContent)
+
 	go tunnel.DispatchRequests()
 
 	for {

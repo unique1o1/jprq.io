@@ -27,8 +27,8 @@ type Tunnel struct {
 	host                     string
 	conn                     *Socket
 	token                    string
-	requestsTracker          sync.Map
-	requestChan              chan RequestMessage
+	requestsTracker          sync.Map            // `Key`["ID"] : `Value`[ResponseChan] each request has an id that is mapped to a Response channel
+	requestChan              chan RequestMessage //request dispatcher to the client [all messages to the client is sent through this channel]
 	requestChanCloseNotifier chan struct{}
 	numOfReqServed           int
 }
