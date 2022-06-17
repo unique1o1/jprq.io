@@ -73,7 +73,7 @@ func (responseMessage ResponseMessage) WriteToHttpResponse(writer http.ResponseW
 		// Set CORS Headers
 		writer.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
 		writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		writer.Header().Set("Access-Control-Allow-Headers", strings.Join([]string{"POST", "GET", "DELETE", "PATCH", "PUT", "OPTIONS", "PURGE", "HEAD"}, ","))
+		writer.Header().Set("Access-Control-Allow-Methods", strings.Join([]string{"POST", "GET", "DELETE", "PATCH", "PUT", "OPTIONS", "PURGE", "HEAD"}, ","))
 		writer.Header().Set("Access-Control-Max-Age", "86400")
 	}
 	for _, cookie := range responseMessage.Cookie {
